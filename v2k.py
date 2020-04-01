@@ -26,7 +26,7 @@ SOUND_ID = 20
 BPM_SIMPLE = 21
 
 FX_BEAT_VOLUME = 18
-TILT_FACTOR = 14
+TILT_FACTOR = 10
 
 VOL_CHAR = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmno"
 FILTER = ["peak", "lpf1", "lpf1", "hpf1", "hpf1", "lbic", "nof"]
@@ -989,8 +989,13 @@ def map2kshbeats(bmap, fx = None):
             mix = float(effect[1])
             emap += "#define_fx %s_L type=TapeStop;mix=%d%%>%d%%\n" % (name, 0, mix)
             emap += "#define_fx %s_R type=TapeStop;mix=%d%%>%d%%\n" % (name, 0, mix)
-            # speed = (50 - effect[3] * 50)
-            speed = 17.3 - 0.583 * float(effect[3]) / (float(effect[3]) + 0.1)
+
+            # Sound Accurate
+            speed = (50 - effect[3] * 50)
+
+            # Time Accurate
+            # speed = 17.3 - 0.583 * float(effect[3]) / (float(effect[3]) + 0.1)
+
             if (speed > 100):
                 speed = 100
             if (speed < 1):
