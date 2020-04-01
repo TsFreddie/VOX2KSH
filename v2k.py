@@ -866,11 +866,11 @@ def map2kshbeats(bmap, fx = None):
                 if (wavelength >= 64):
                     mix = int(mix * 0.8)
                 if (fx_type == 8):
-                    left_name = "%s_L;%f\nfx:%s_L:updateTrigger=on" % (name, 1/wavelength, name)
-                    right_name = "%s_R;%f\nfx:%s_R:updateTrigger=on" % (name, 1/wavelength, name)
+                    left_name = "%s_L;%f\nfx:%s_L:updateTrigger=on" % (name, wavelength, name)
+                    right_name = "%s_R;%f\nfx:%s_R:updateTrigger=on" % (name, wavelength, name)
                 else:
-                    left_name = "%s_L;%f" % (name, 1/wavelength)
-                    right_name = "%s_R;%f" % (name, 1/wavelength)
+                    left_name = "%s_L;%f" % (name, wavelength)
+                    right_name = "%s_R;%f" % (name, wavelength)
                 emap += "#define_fx %s_L type=Retrigger;rate=%d%%;mix=%d%%>%d%%;updatePeriod=%f\n" % (name, effect[5] * 80, 0, mix, period)
                 emap += "#define_fx %s_R type=Retrigger;rate=%d%%;mix=%d%%>%d%%;updatePeriod=%f\n" % (name, effect[5] * 80, 0, mix, period)
 
