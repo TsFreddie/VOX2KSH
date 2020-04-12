@@ -1436,4 +1436,4 @@ if (__name__ == "__main__"):
     target = sys.argv[2]
 
     with open(target, 'w', encoding="utf-8-sig") as f:
-        f.write(vox2ksh(path, "%d.ogg")[0])
+        f.write(vox2ksh(path)[0])
