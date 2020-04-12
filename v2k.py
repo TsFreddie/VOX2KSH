@@ -923,7 +923,8 @@ def map2kshbeats(bmap, fx = None):
             else:
                 # Echo
                 mix = int(effect[2])
-                new_type = (";updatePeriod=%f" % (abs(float(effect[3])) / 2))
+                # new_type = (";updatePeriod=%f" % (abs(float(effect[3]))))
+                new_type = (";updatePeriod=0") # default to no update?
                 feedback = effect[4] * 115
                 if feedback > 95:
                     feedback = 95
@@ -933,7 +934,7 @@ def map2kshbeats(bmap, fx = None):
                     mix = int(effect[2]) * 0.85
 
                 effect[3] = abs(float(effect[3]))
-                wavelength = (int(effect[1] // effect[3]) * 4)
+                wavelength = (float(effect[1] / effect[3]) * 4)
                 if (wavelength <= 0):
                     wavelength = 1
 
@@ -952,7 +953,6 @@ def map2kshbeats(bmap, fx = None):
             # Gate
             mix = float(effect[1]) * 0.75
             rate = float(effect[3])
-            emap += "#define_fx %s type=Gate;rate=%d%%;mix=%d%%>%d%%\n" % (name, rate * 60, 0, mix)
             emap += "#define_fx %s type=Gate;rate=%d%%;mix=%d%%>%d%%\n" % (name, rate * 60, 0, mix)
             wavelength = (effect[2] * 2)
             if (wavelength <= 0):
