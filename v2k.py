@@ -1010,7 +1010,7 @@ def map2kshbeats(bmap, fx = None):
                     if (speed_low > 100):
                         speed_low = 100
                     if (speed_low < 1):
-                        wl_lospeed_loww = 1
+                        speed_low = 1
                     speed_high = 17.3 - 0.583 * float(tab_param[i][3][1]) / (float(tab_param[i][3][1]) + 0.1)
                     if (speed_high > 100):
                         speed_high = 100
@@ -1254,7 +1254,7 @@ def map2kshbeats(bmap, fx = None):
                 other_lane = 7 - fx
                 if (fx_collision[fx] is not None):
                     if (fx_collision[other_lane] is not None):
-                        if (fx_collision[fx] > fx_collision[other_lane]):
+                        if (fx == 6):
                             fx_hostage[fx] = fx_names[0 if other_lane == 1 else 1][fx_collision[other_lane]].split(";")[0]
                             if (fx_mix[fx_hostage[fx]] is not None):
                                 kmap+="fx:%s:mix=0%%>0%%\n" % (fx_hostage[fx])
@@ -1295,8 +1295,7 @@ def map2kshbeats(bmap, fx = None):
                         if (filter_type >= 0 and filter_type < len(FILTER)):
                             add_filter = "filtertype=%s\n" % FILTER[filter_type]
                             cur_filter = filter_type
-
-                    pos = int(data[0] / 127 * (len(VOL_CHAR) - 1))
+                    pos = int(round(data[0] / 127.0 * (len(VOL_CHAR) - 1)))
                     if data[1] == 1:
                         if (data[4]):
                             kmap+="laserrange_" + ("l" if vol == 0 else "r") + "=2x\n"
