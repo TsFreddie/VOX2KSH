@@ -27,6 +27,7 @@ BPM_SIMPLE = 21
 
 FX_BEAT_VOLUME = 18
 TILT_FACTOR = 10
+VOL_DRIFT_TOLERANCE = 2
 
 VOL_CHAR = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmno"
 FILTER = ["peak", "lpf1", "lpf1", "hpf1", "hpf1", "lbic", "nof"]
@@ -229,14 +230,14 @@ def readvox(filename):
     zoom_bottom_realize = []
     tab_param = {}
 
-    last_zoom_top = None
-    last_zoom_bottom = None
+    prev_zoom_top = None
+    prev_zoom_bottom = None
 
-    last_stop = None
+    prev_stop = None
 
-    last_measure = None
+    prev_measure = None
 
-    last_tilt = None
+    prev_tilt = None
 
     state = -1
     line_num = 0
@@ -327,8 +328,8 @@ def readvox(filename):
                 if (measure not in measures):
                     measures[measure] = 1
 
-                if (last_measure is None or measure > last_measure):
-                    last_measure = measure
+                if (prev_measure is None or measure > prev_measure):
+                    prev_measure = measure
 
             #endregion
             #region [rgba(0, 32, 0, 0.5)] BPM_SIMPLE
@@ -364,13 +365,13 @@ def readvox(filename):
 
                 try:
                     if data[2].endswith("-"):
-                        if (last_stop is None):
-                            last_stop = time
+                        if (prev_stop is None):
+                            prev_stop = time
                         data[2] = data[2][:-1]
                     else:
-                        if (last_stop is not None):
-                            stop[last_stop] = time_difference(last_stop, time, beats)
-                            last_stop = None
+                        if (prev_stop is not None):
+                            stop[prev_stop] = time_difference(prev_stop, time, beats)
+                            prev_stop = None
                     bpms[time] = (float(data[1]), int(data[2]))
                 except:
                     print("[BPM Error] cannot parse line at %d" % line_num)
@@ -384,8 +385,8 @@ def readvox(filename):
                 else:
                     measures[measure] = lcm(measures[measure], note)
 
-                if (last_measure is None or measure > last_measure):
-                    last_measure = measure
+                if (prev_measure is None or measure > prev_measure):
+                    prev_measure = measure
             #endregion
             #region [rgba(32, 16, 256, 0.5)] TAB_PARAM
             elif (state == TAB_PARAM):
@@ -565,11 +566,11 @@ def readvox(filename):
                     else:
                         measures[mid_measure] = lcm(measures[mid_measure], mid_note)
 
-                if (last_measure is None or measure > last_measure):
-                    last_measure = measure
+                if (prev_measure is None or measure > prev_measure):
+                    prev_measure = measure
 
-                if (last_measure is None or alt_measure > last_measure):
-                    last_measure = alt_measure
+                if (prev_measure is None or alt_measure > prev_measure):
+                    prev_measure = alt_measure
 
             #endregion #region [rgba(0, 128, 128, 0.5)] TILT
             elif (state == TILT):
@@ -593,32 +594,32 @@ def readvox(filename):
                 try:
                     tilt_mode = int(data[1])
                     if tilt_mode == 0:
-                        last_tilt = "normal"
+                        prev_tilt = "normal"
                     elif tilt_mode == 1:
-                        last_tilt = "bigger"
+                        prev_tilt = "bigger"
                     elif tilt_mode == 2:
-                        last_tilt = "keep_bigger"
+                        prev_tilt = "keep_bigger"
                     else:
                         print("[TILT Error] Unknown tilt mode %d" % tilt_mode)
-                        last_tilt = None
+                        prev_tilt = None
                 except:
                     print("[TILT Error] cannot parse tilt mode at %d" % line_num)
-                    last_tilt = None
+                    prev_tilt = None
                     continue
 
-                if (last_tilt is not None):
+                if (prev_tilt is not None):
                     if (time in tilt):
-                        tilt[time].append(last_tilt)
+                        tilt[time].append(prev_tilt)
                     else:
-                        tilt[time] = [last_tilt]
+                        tilt[time] = [prev_tilt]
 
                 if (measure not in measures):
                     measures[measure] = note
                 else:
                     measures[measure] = lcm(measures[measure], note)
 
-                if (last_measure is None or measure > last_measure):
-                    last_measure = measure
+                if (prev_measure is None or measure > prev_measure):
+                    prev_measure = measure
             #endregion #region [rgba(72, 64, 256, 0.5)] SPCONTROLLER
             elif (state == SPCONTROLER):
                 data = line.split('\t')
@@ -655,12 +656,12 @@ def readvox(filename):
                         alt_measure = alt_time[0]
 
                         if (time in zoom_top):
-                            if (last_zoom_top is not None):
-                                zoom_top[time].append(last_zoom_top)
+                            if (prev_zoom_top is not None):
+                                zoom_top[time].append(prev_zoom_top)
                             zoom_top[time].append(from_pos)
                         else:
-                            if (last_zoom_top is not None):
-                                zoom_top[time] = [last_zoom_top, from_pos]
+                            if (prev_zoom_top is not None):
+                                zoom_top[time] = [prev_zoom_top, from_pos]
                             else:
                                 zoom_top[time] = [from_pos]
 
@@ -669,7 +670,7 @@ def readvox(filename):
                         else:
                             zoom_top[alt_time] = [to_pos]
 
-                        last_zoom_top = to_pos
+                        prev_zoom_top = to_pos
                     except:
                         print("[SP Error] cannot parse CAM_RotX at %d" % line_num)
                         continue
@@ -685,12 +686,12 @@ def readvox(filename):
                         alt_measure = alt_time[0]
 
                         if (time in zoom_bottom):
-                            if (last_zoom_bottom is not None):
-                                zoom_bottom[time].append(last_zoom_bottom)
+                            if (prev_zoom_bottom is not None):
+                                zoom_bottom[time].append(prev_zoom_bottom)
                             zoom_bottom[time].append(from_pos)
                         else:
-                            if (last_zoom_bottom is not None):
-                                zoom_bottom[time] = [last_zoom_bottom, from_pos]
+                            if (prev_zoom_bottom is not None):
+                                zoom_bottom[time] = [prev_zoom_bottom, from_pos]
                             else:
                                 zoom_bottom[time] = [from_pos]
 
@@ -699,7 +700,7 @@ def readvox(filename):
                         else:
                             zoom_bottom[alt_time] = [to_pos]
 
-                        last_zoom_bottom = to_pos
+                        prev_zoom_bottom = to_pos
                     except:
                         print("[SP Error] cannot parse CAM_Radi at %d" % line_num)
                         continue
@@ -800,11 +801,11 @@ def readvox(filename):
                     else:
                         measures[alt_measure] = lcm(measures[alt_measure], alt_note)
 
-                if (last_measure is None or measure > last_measure):
-                    last_measure = measure
+                if (prev_measure is None or measure > prev_measure):
+                    prev_measure = measure
 
-                if (last_measure is None or alt_measure > last_measure):
-                    last_measure = alt_measure
+                if (prev_measure is None or alt_measure > prev_measure):
+                    prev_measure = alt_measure
 
             #endregion
             elif (state == END_POSITION):
@@ -814,11 +815,11 @@ def readvox(filename):
                     continue
                 end = time
 
-    if (last_stop is not None):
-        stop[last_stop] = time_difference(last_stop, end, beats)
+    if (prev_stop is not None):
+        stop[prev_stop] = time_difference(prev_stop, end, beats)
 
     if (end is None):
-        end = (last_measure+1, 0, 0)
+        end = (prev_measure+1, 0, 0)
 
     return (version, (effects, effects2, effect_is_filter), (zoom_top, zoom_bottom, tilt, lane_toggle), beats, bpms, tracks, custom_filter, tab_param, measures, stop, end)
 
@@ -1121,13 +1122,14 @@ def map2kshbeats(bmap, fx = None):
     fx_hostage = [None for i in range(8)]
     cur_filter = None
     hold_filter = 0
-    # last_filter = 0
+    # prev_filter = 0
     cur_gain = 90
-    last_bpm = None
+    prev_bpm = None
 
     lane_hiding = False
 
     kmap = "--\n"
+    vol_prev_pos = [None for i in range(8)]
     for measure in range(1, end[0]+1):
         beat_sig = current_beat(beats, measure)
         beat_step = (192 // beat_sig[1])
@@ -1176,8 +1178,8 @@ def map2kshbeats(bmap, fx = None):
             if time in beats:
                 kmap+="beat=%d/%d\n" % beats[time]
             if time in bpms:
-                if (last_bpm != bpms[time][0]):
-                    last_bpm = bpms[time][0]
+                if (prev_bpm != bpms[time][0]):
+                    prev_bpm = bpms[time][0]
                     kmap+="t=%f\n" % bpms[time][0]
             if time in stop:
                 kmap+="stop=%d\n" % (stop[time])
@@ -1295,7 +1297,17 @@ def map2kshbeats(bmap, fx = None):
                         if (filter_type >= 0 and filter_type < len(FILTER)):
                             add_filter = "filtertype=%s\n" % FILTER[filter_type]
                             cur_filter = filter_type
-                    pos = int(round(data[0] / 127.0 * (len(VOL_CHAR) - 1)))
+                    
+                    if (vol_prev_pos[vol] is None):
+                        pos = int(round(data[0] / 127.0 * (len(VOL_CHAR) - 1)))
+                    else:
+                        if (abs(data[0] - vol_prev_pos[vol]) <= VOL_DRIFT_TOLERANCE):
+                            pos = int(round(vol_prev_pos[vol] / 127.0 * (len(VOL_CHAR) - 1)))
+                        else:
+                            pos = int(round(data[0] / 127.0 * (len(VOL_CHAR) - 1)))
+
+                    vol_prev_pos[vol] = data[0]
+
                     if data[1] == 1:
                         if (data[4]):
                             kmap+="laserrange_" + ("l" if vol == 0 else "r") + "=2x\n"
@@ -1376,7 +1388,7 @@ def map2kshbeats(bmap, fx = None):
                     if (allowed_filters[filter_num]):
                         add_filter += "filter:ft%d:updateTrigger=on\n" % (filter_num)
                     hold_filter = filter_duration - step
-                    # last_filter = cur_filter
+                    # prev_filter = cur_filter
                     cur_filter = -1
 
             if (add_filter is not None):
@@ -1392,23 +1404,23 @@ def map2kshbeats(bmap, fx = None):
             for cam in sps:
                 op_name, target, translate = cam
                 if (time in target):
-                    last_pos = None
+                    prev_pos = None
                     if (time == (1,1,0)):
                         pos = target[time][-1]
                         if (type(pos) == str):
                             kmap += "%s=%s\n" % (op_name, pos)
                         else:
                             kmap += "%s=%.2f\n" % (op_name, translate(pos))
-                        last_pos = pos
+                        prev_pos = pos
                     else:
                         for pos in target[time]:
-                            if (pos == last_pos):
+                            if (pos == prev_pos):
                                 continue
                             if (type(pos) == str):
                                 kmap += "%s=%s\n" % (op_name, pos)
                             else:
                                 kmap += "%s=%.2f\n" % (op_name, translate(pos))
-                            last_pos = pos
+                            prev_pos = pos
 
             # lane_toggle
             if (time in camera[3]):
