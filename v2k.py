@@ -176,10 +176,18 @@ def advance_time(time, delta, beats):
         beat_sig = current_beat(beats, measure)
         beat_step = (192 // beat_sig[1])
         measure_step = beat_sig[0] * beat_step
+
+    while (step < 0):
+        measure -= 1
+        step += measure_step
+        beat_sig = current_beat(beats, measure)
+        beat_step = (192 // beat_sig[1])
+        measure_step = beat_sig[0] * beat_step
+
     beat = (step // beat_step)+1
     sub = (step % beat_step)
     note = measure_step // gcd(measure_step, (beat-1) * beat_step + sub)
-    return ((measure, beat, sub), note)
+    return ((measure, beat, sub), abs(note))
 
 def time_difference(time_early, time_late, beats):
     measure, beat, sub = time_early
@@ -209,6 +217,105 @@ def normalize_angle(angle):
     return ((angle + 179) % 360 + 360) % 360 - 179
 
 
+def interp_vol_values(measures, tracks, vol, vol_interp, beats, end_slam):
+    interp_points = vol_interp[vol]
+    len_points = len(interp_points)
+    track_id = vol * 7
+
+    if (len_points < 2):
+        return
+
+    if (len_points == 2):
+        # if (interp_points[0][2] and end_slam):
+        #     # consecutive slam, safely ignore
+        #     print("consecutive slam at:", interp_points[0][0], interp_points[1][0])
+        #     interp_points.clear()
+        #     return
+        # else:
+
+        if (interp_points[0][2]):
+            # high res come from slam, try to compress the prev slam to give more room for line.
+            data = interp_points[0][1]
+            data = (data[0], data[1], data[2], data[3], data[4], data[5], True)
+            tracks[track_id][interp_points[0][0]] = data
+
+            back_time, back_note = advance_time(interp_points[0][0], -2, beats)
+            back_measure = back_time[0]
+    
+            if (back_measure not in measures):
+                measures[back_measure] = back_note
+            else:
+                measures[back_measure] = lcm(measures[back_measure], back_note)
+
+            tracks[track_id][back_time] = interp_points[0][1]
+        else:
+            print("impossible interp at:", interp_points[0][0], interp_points[1][0])
+        interp_points.clear()
+        return
+
+        
+    # print("hi-res secion ends at:", interp_points)
+    
+    if (len_points % 2 == 1):
+        # odd sections: halfing the samples
+        for i in range(len_points):
+            data = interp_points[i][1]
+            if (i != len_points - 1 and i % 2 == 1):
+                data = (data[0], data[1], data[2], data[3], data[4], data[5], True)
+            tracks[track_id][interp_points[i][0]] = data
+            # print(track_id, interp_points[i][0], data)
+    else:
+        sections = len_points - 1
+        pulses = sections * 6
+        step = -1
+        for j in range(9, pulses):
+            if pulses % j == 0:
+                step = j
+                break
+        
+        cur = 0
+        cur_time = interp_points[0][0]
+
+        # ghostify all points in between
+        for i in range(1, len_points - 1):
+            data = interp_points[i][1]
+            data = (data[0], data[1], data[2], data[3], data[4], data[5], True)
+            tracks[track_id][interp_points[i][0]] = data
+
+        while (cur < pulses):
+            cur += step
+            if (cur >= pulses):
+                break
+            
+            cur_time, cur_note = advance_time(cur_time, step, beats)
+            if (cur_time in tracks[track_id]):
+                # un-ghostify matching points
+                data = tracks[track_id][cur_time]
+                data = (data[0], data[1], data[2], data[3], data[4], data[5], False)
+                tracks[track_id][cur_time] = data
+                continue
+
+            start_idx = cur // 6
+            start_pulse = start_idx * 6
+            end_pulse = (start_idx + 1) * 6
+            start_point = interp_points[start_idx][1]
+            end_point = interp_points[start_idx + 1][1]
+
+            value = start_point[0] + ((cur - start_pulse) / (end_pulse - start_pulse)) * (end_point[0] - start_point[0])
+
+
+            data = (int(value), start_point[1], start_point[2], start_point[3], start_point[4], start_point[5], False)
+            tracks[track_id][cur_time] = data
+            # print("inter:", track_id, cur_time, data)
+            cur_measure = cur_time[0]
+            if (cur_measure not in measures):
+                measures[cur_measure] = cur_note
+            else:
+                measures[cur_measure] = lcm(measures[cur_measure], cur_note)
+
+    interp_points.clear()
+    return
+
 def readvox(filename):
     # Read object
     version = -1
@@ -235,9 +342,12 @@ def readvox(filename):
 
     prev_stop = None
 
-    prev_measure = None
+    last_measure = None
 
     prev_tilt = None
+
+    prev_vol = [None, None]
+    vol_interp = [[], []]
 
     state = -1
     line_num = 0
@@ -328,8 +438,8 @@ def readvox(filename):
                 if (measure not in measures):
                     measures[measure] = 1
 
-                if (prev_measure is None or measure > prev_measure):
-                    prev_measure = measure
+                if (last_measure is None or measure > last_measure):
+                    last_measure = measure
 
             #endregion
             #region [rgba(0, 32, 0, 0.5)] BPM_SIMPLE
@@ -385,8 +495,8 @@ def readvox(filename):
                 else:
                     measures[measure] = lcm(measures[measure], note)
 
-                if (prev_measure is None or measure > prev_measure):
-                    prev_measure = measure
+                if (last_measure is None or measure > last_measure):
+                    last_measure = measure
             #endregion
             #region [rgba(32, 16, 256, 0.5)] TAB_PARAM
             elif (state == TAB_PARAM):
@@ -487,19 +597,44 @@ def readvox(filename):
                         if (len(data) >= 7):
                             extra = int(data[6])
 
+                        vol = track_id // 7
+
                         if (time in tracks[track_id]):
+                            if (len(vol_interp[vol]) > 0):
+                                interp_vol_values(measures, tracks, vol, vol_interp, beats, True)
                             # Slam
                             mid_time, mid_note = advance_time(time, 4, beats)
                             alt_time, alt_note = advance_time(time, 6, beats)
-                            tracks[track_id][alt_time] = (int(data[1]), int(data[2]), int(data[3]), sound_type, wide, extra)
+                            tracks[track_id][alt_time] = (int(data[1]), int(data[2]), int(data[3]), sound_type, wide, extra, False) # False -> not ghost
                             alt_measure = alt_time[0]
                             mid_measure = mid_time[0]
+
+                            prev_vol[vol] = (alt_time, tracks[track_id][alt_time], True)
                         else:
-                            tracks[track_id][time] = (int(data[1]), int(data[2]), int(data[3]), sound_type, wide, extra)
+                            tracks[track_id][time] = (int(data[1]), int(data[2]), int(data[3]), sound_type, wide, extra, False)
                             # give end note a bit head room (see XROSS THE XOUL)
                             if (tracks[track_id][time][1] == 2):
                                 alt_time, alt_note = advance_time(time, 12, beats)
                                 alt_measure = alt_time[0]
+
+                            vol_buf_data = (time, tracks[track_id][time], False)
+
+                            if (prev_vol[vol] is not None):
+                                time_diff = time_difference(prev_vol[vol][0], time, beats)
+                                if (time_diff == 6):
+                                    if (len(vol_interp[vol]) == 0):
+                                        vol_interp[vol].append(prev_vol[vol])
+                                    vol_interp[vol].append(vol_buf_data)
+                                elif (time_diff < 6):
+                                    if (not prev_vol[vol][2]):
+                                        print("unhandled laser at:", time, time_diff)
+                                    if (len(vol_interp[vol]) > 0):
+                                        interp_vol_values(measures, tracks, vol, vol_interp, beats, False)
+                                else:
+                                    if (len(vol_interp[vol]) > 0):
+                                        interp_vol_values(measures, tracks, vol, vol_interp, beats, False)
+
+                            prev_vol[vol] = vol_buf_data
                     except:
                         print("[TRACK Error] cannot parse line at %d" % line_num)
                         continue
@@ -566,11 +701,11 @@ def readvox(filename):
                     else:
                         measures[mid_measure] = lcm(measures[mid_measure], mid_note)
 
-                if (prev_measure is None or measure > prev_measure):
-                    prev_measure = measure
+                if (last_measure is None or measure > last_measure):
+                    last_measure = measure
 
-                if (prev_measure is None or alt_measure > prev_measure):
-                    prev_measure = alt_measure
+                if (last_measure is None or alt_measure > last_measure):
+                    last_measure = alt_measure
 
             #endregion #region [rgba(0, 128, 128, 0.5)] TILT
             elif (state == TILT):
@@ -618,8 +753,8 @@ def readvox(filename):
                 else:
                     measures[measure] = lcm(measures[measure], note)
 
-                if (prev_measure is None or measure > prev_measure):
-                    prev_measure = measure
+                if (last_measure is None or measure > last_measure):
+                    last_measure = measure
             #endregion #region [rgba(72, 64, 256, 0.5)] SPCONTROLLER
             elif (state == SPCONTROLER):
                 data = line.split('\t')
@@ -801,11 +936,11 @@ def readvox(filename):
                     else:
                         measures[alt_measure] = lcm(measures[alt_measure], alt_note)
 
-                if (prev_measure is None or measure > prev_measure):
-                    prev_measure = measure
+                if (last_measure is None or measure > last_measure):
+                    last_measure = measure
 
-                if (prev_measure is None or alt_measure > prev_measure):
-                    prev_measure = alt_measure
+                if (last_measure is None or alt_measure > last_measure):
+                    last_measure = alt_measure
 
             #endregion
             elif (state == END_POSITION):
@@ -815,11 +950,15 @@ def readvox(filename):
                     continue
                 end = time
 
+    # clear interp
+    interp_vol_values(measures, tracks, 0, vol_interp, beats, False)
+    interp_vol_values(measures, tracks, 1, vol_interp, beats, False)
+
     if (prev_stop is not None):
         stop[prev_stop] = time_difference(prev_stop, end, beats)
 
     if (end is None):
-        end = (prev_measure+1, 0, 0)
+        end = (last_measure+1, 0, 0)
 
     return (version, (effects, effects2, effect_is_filter), (zoom_top, zoom_bottom, tilt, lane_toggle), beats, bpms, tracks, custom_filter, tab_param, measures, stop, end)
 
@@ -1314,7 +1453,12 @@ def map2kshbeats(bmap, fx = None):
                         hold[vol] = 1
                     if data[1] == 2:
                         hold[vol] = -1
-                    note += VOL_CHAR[pos]
+
+                    if (data[6]):
+                        # is ghost
+                        note += ":"
+                    else:
+                        note += VOL_CHAR[pos]
 
                     # try Spin Effect if not yet
                     if (len(spin) == 0 and data[2] > 0):
