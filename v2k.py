@@ -226,13 +226,6 @@ def interp_vol_values(measures, tracks, vol, vol_interp, beats, end_slam):
         return
 
     if (len_points == 2):
-        # if (interp_points[0][2] and end_slam):
-        #     # consecutive slam, safely ignore
-        #     print("consecutive slam at:", interp_points[0][0], interp_points[1][0])
-        #     interp_points.clear()
-        #     return
-        # else:
-
         if (interp_points[0][2]):
             # high res come from slam, try to compress the prev slam to give more room for line.
             data = interp_points[0][1]
@@ -248,8 +241,18 @@ def interp_vol_values(measures, tracks, vol, vol_interp, beats, end_slam):
                 measures[back_measure] = lcm(measures[back_measure], back_note)
 
             tracks[track_id][back_time] = interp_points[0][1]
+        elif (interp_points[0][1][1] == 0):
+            data = interp_points[0][1]
+            data = (data[0], data[1], data[2], data[3], data[4], data[5], True)
+            tracks[track_id][interp_points[0][0]] = data
+            print("Warning: dropping enclosed sample at:", interp_points[0][0])
+        elif (interp_points[1][1][1] == 0):
+            data = interp_points[1][1]
+            data = (data[0], data[1], data[2], data[3], data[4], data[5], True)
+            tracks[track_id][interp_points[1][0]] = data
+            print("Warning: dropping enclosed sample at:", interp_points[1][0])
         else:
-            print("impossible interp at:", interp_points[0][0], interp_points[1][0])
+            print("Warning: impossible interp at:", interp_points[0][0], interp_points[1][0])
         interp_points.clear()
         return
 
@@ -627,7 +630,7 @@ def readvox(filename):
                                     vol_interp[vol].append(vol_buf_data)
                                 elif (time_diff < 6):
                                     if (not prev_vol[vol][2]):
-                                        print("unhandled laser at:", time, time_diff)
+                                        print("Warning: unhandled laser at:", time, time_diff)
                                     if (len(vol_interp[vol]) > 0):
                                         interp_vol_values(measures, tracks, vol, vol_interp, beats, False)
                                 else:
@@ -1541,7 +1544,7 @@ def map2kshbeats(bmap, fx = None):
             # SP
             sps = [
                 ("zoom_top", camera[0], lambda x: camera_transpose(x)),
-                ("zoom_bottom", camera[1], lambda x: -(x-60.12)*1.6),
+                ("zoom_bottom", camera[1], lambda x: -(x-60.12)*2.6),
                 ("tilt", camera[2], lambda x: x),
             ]
 
