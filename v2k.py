@@ -976,6 +976,7 @@ def map2kshbeats(bmap, fx_audio = None):
     # Effects
     emap = ""
     if fx_audio is not None:
+        print(fx_audio)
         emap += "#define_fx FX_TRACK type=SwitchAudio;fileName=%s\n" % (fx_audio)
         emap += "#define_filter ft_TRACK type=SwitchAudio;fileName=%s\n" % (fx_audio)
 
@@ -1142,8 +1143,9 @@ def map2kshbeats(bmap, fx_audio = None):
 
             if (speed > 100):
                 speed = 100
-            if (speed < 1):
-                speed = 1
+            if (speed < 6):
+                print("Warning: low speed TapeStop")
+                speed = 6
             left_name = "%s_L;%d" % (name, speed)
             right_name = "%s_R;%d" % (name, speed)
 
@@ -1153,13 +1155,15 @@ def map2kshbeats(bmap, fx_audio = None):
                     speed_low = 17.3 - 0.583 * float(tab_param[i][3][0]) / (float(tab_param[i][3][0]) + 0.1)
                     if (speed_low > 100):
                         speed_low = 100
-                    if (speed_low < 1):
-                        speed_low = 1
+                    if (speed_low < 6):
+                        print("Warning: low speed TapeStop")
+                        speed_low = 6
                     speed_high = 17.3 - 0.583 * float(tab_param[i][3][1]) / (float(tab_param[i][3][1]) + 0.1)
                     if (speed_high > 100):
                         speed_high = 100
-                    if (speed_high < 1):
-                        speed_high = 1
+                    if (speed_high < 6):
+                        print("Warning: low speed TapeStop")
+                        speed_high = 6
                     speed_tab = str(int(speed_low)) + "%" + "-" + str(int(speed_high)) + "%"
 
             if (i+2 in effects[2]):
@@ -1357,7 +1361,7 @@ def map2kshbeats(bmap, fx_audio = None):
                     data = tracks[fx][time]
                     if data[0] > 0:
                         hold[fx] = data[0] - step
-                        if data[1] == 1 or data[1] == 254 or data[1] == -2:
+                        if fx_audio is not None and data[1] in [1,254,-2]:
                             # SwitchAudio
                             kmap+="fx-%s=FX_TRACK\n" % ("l" if fx == 1 else "r")
                         else:
