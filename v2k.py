@@ -965,7 +965,7 @@ def readvox(filename):
 
     return (version, (effects, effects2, effect_is_filter), (zoom_top, zoom_bottom, tilt, lane_toggle), beats, bpms, tracks, custom_filter, tab_param, measures, stop, end)
 
-def map2kshbeats(bmap, fx = None):
+def map2kshbeats(bmap, fx_audio = None):
     version, effects, camera, beats, bpms, tracks, custom_filter, tab_param, measures, stop, end = bmap
 
     fx_names = [{}, {}]
@@ -975,8 +975,9 @@ def map2kshbeats(bmap, fx = None):
 
     # Effects
     emap = ""
-    if fx is not None:
-        emap += "#define_fx FX_TRACK type=SwitchAudio;fileName=%s\n" % (fx)
+    if fx_audio is not None:
+        emap += "#define_fx FX_TRACK type=SwitchAudio;fileName=%s\n" % (fx_audio)
+        emap += "#define_filter ft_TRACK type=SwitchAudio;fileName=%s\n" % (fx_audio)
 
     allowed_filters = {}
     for i in range(len(effects[0])):
@@ -1398,7 +1399,7 @@ def map2kshbeats(bmap, fx = None):
                 other_lane = 7 - fx
                 if (fx_collision[fx] is not None):
                     if (fx_collision[other_lane] is not None):
-                        if (fx == 6):
+                        if (fx == 6 and fx_collision[fx] != fx_collision[other_lane]):
                             fx_hostage[fx] = fx_names[0 if other_lane == 1 else 1][fx_collision[other_lane]].split(";")[0]
                             if (fx_mix[fx_hostage[fx]] is not None):
                                 kmap+="fx:%s:mix=0%%>0%%\n" % (fx_hostage[fx])
@@ -1534,6 +1535,12 @@ def map2kshbeats(bmap, fx = None):
                     add_filter = "filtertype=ft%d\n" % (filter_num)
                     if (allowed_filters[filter_num]):
                         add_filter += "filter:ft%d:updateTrigger=on\n" % (filter_num)
+                    hold_filter = filter_duration - step
+                    # prev_filter = cur_filter
+                    cur_filter = -1
+                elif (fx_audio is not None and filter_num+2 in [1,-2,254]):
+                    print("Warning: AudioSwitch auto tab:", fx_audio, filter_num+2)
+                    add_filter = "filtertype=ft_TRACK\n"
                     hold_filter = filter_duration - step
                     # prev_filter = cur_filter
                     cur_filter = -1
